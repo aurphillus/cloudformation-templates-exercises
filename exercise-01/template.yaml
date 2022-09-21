@@ -1,0 +1,93 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: "Resources for exercise 1"
+
+Resources:
+
+  EncryptedBucket1:
+    Type: AWS::S3::Bucket
+    Properties: 
+      AccessControl: Private
+      BucketName: encryptedbucket-cc-test-1
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      ReplicationConfiguration:
+        Role: !Ref ReplicationRole
+        Rules:
+          - Destination:
+              Bucket: !Sub 
+                - arn:aws:s3:::${bucketName}
+                - bucketName: !Ref EncryptedBucket2
+              StorageClass: STANDARD
+            Status: Enabled
+
+  EncryptedBucket2:
+    Type: AWS::S3::Bucket
+    Properties: 
+      AccessControl: Private
+      BucketName: encryptedbucket-cc-test-2
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  Bucket1Policy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref EncryptedBucket1
+      PolicyDocument: 
+        Version: 2012-10-17
+        Statement:
+          - Action: 
+              - "s3:*"
+            Effect: Allow
+            Resource: !Sub 
+              - arn:aws:s3:::${bucketName}/*
+              - bucketName: !Ref EncryptedBucket1
+            Principal: "*"
+
+  ReplicationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: "/"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action:
+            - "sts:AssumeRole"
+        Principal:
+          Service: "s3.amazonaws.com"
+        Effect: Allow
+      Policies:
+        - PolicyDocument:
+           Version: "2012-10-17"
+           Statement:
+              - Effect: "Allow"
+                Action:
+                  - "s3:GetReplicationConfiguration"
+                  - "s3:ListBucket"
+                Resource: !Sub 
+                  - "arn:aws:s3:::${sourceBucket}"
+                  - sourceBucket: !Ref EncryptedBucket1
+              - Effect: "Allow"
+                Action:
+                  - "s3:GetObjectVersionForReplication"
+                  - "s3:GetObjectVersionAcl"
+                  - "s3:GetObjectVersionTagging"
+                Resource: !Sub 
+                  - "arn:aws:s3:::${sourceBucket}/*"
+                  - sourceBucket: !Ref EncryptedBucket1
+              - Effect: "Allow"
+                Action:
+                  - "s3:ReplicateObject"
+                  - "s3:ReplicateDelete"
+                  - "s3:ReplicateTags"
+                Resource: "*"
+                # Resource: !Sub 
+                #   - "arn:aws:s3:::${destinationBucket}/*"
+                #   - destinationBucket: !Ref EncryptedBucket2
+                
